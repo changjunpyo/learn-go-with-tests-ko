@@ -1,25 +1,24 @@
 # Time
 
-**[You can find all the code for this chapter here](https://github.com/quii/learn-go-with-tests/tree/main/time)**
+**[이 챕터에서 사용되는 모든 코드는 여기서 찾을 수 있다.](https://github.com/quii/learn-go-with-tests/tree/main/time)**
 
-The product owner wants us to expand the functionality of our command line application by helping a group of people play Texas-Holdem Poker.
+서비스 기획자는 우리에게 그룹끼리 텍사스 홀덤 포커를 할 수 있도록 우리의 커맨드 라인 어플리케이션의 기능을 확장하길 원한다.
 
-## Just enough information on poker
+## 포커에 대한 충분한 정보
 
-You won't need to know much about poker, only that at certain time intervals all the players need to be informed of a steadily increasing "blind" value.
+포커에 대해서 자세히 알아야할 필요는 없지만, 알아야 하는 것은 특정 시간의 간격을 두고 모든 플레이어는 꾸준히 증가하는 "블라인드" 값에 대한 고지를 받아야 한다는 것이다. 
 
-Our application will help keep track of when the blind should go up, and how much it should be.
+우리의 어플리케이션은 언제, 얼마나 블라인드가 올라 가는지를 알 수 있도록 도와야한다.  
 
-- When it starts it asks how many players are playing. This determines the amount of time there is before the "blind" bet goes up.
-  - There is a base amount of time of 5 minutes.
-  - For every player, 1 minute is added.
-  - e.g 6 players equals 11 minutes for the blind.
-- After the blind time expires the game should alert the players the new amount the blind bet is.
-- The blind starts at 100 chips, then 200, 400, 600, 1000, 2000 and continue to double until the game ends (our previous functionality of "Ruth wins" should still finish the game)
+- 게임을 시작하면 몇명이 플레이하는지 묻는다. 이것을 통해 "블라인드" 베팅 값이 올라가기전의 시간을 결정하게 된다.
+  - 기본 시간은 5분으로 설정 된다.
+  - 모든 플레이어 한명마다 1분씩 추가된다.
+  - 예를 들어, 6명의 플레이어라면 블라인드를 위한 시간은 11분이 된다.
+- 블라인드 시간이 지나게 되면 게임은 플레이어들에게 새로운 블라인드 베팅 값을 알려주게 된다.
+- 블라인드는 100칩에서 시작하여, 200, 400, 600, 1000, 2000, 그리고 게임이 끝날 때까지 2배로 증가한다.(이전에 만든 기능인 "Ruth wins" 또한 여전히 게임을 끝낼 수 있다)
+## 코드의 리마인더
 
-## Reminder of the code
-
-In the previous chapter we made our start to the command line application which already accepts a command of `{name} wins`. Here is what the current `CLI` code looks like, but be sure to familiarise yourself with the other code too before starting.
+이전 챕터에서 우리는 벌써 `{name} wins`와 같은 명령을 받아 들이는 커맨드라인 어플리케이션을 만들기 시작했다. 이것은 현재 `CLI` 코드의 형태이지만, 시작하기전에 다른 코드도 확실히 익숙해지도록 하자.
 
 ```go
 type CLI struct {
@@ -52,31 +51,30 @@ func (cli *CLI) readLine() string {
 
 ### `time.AfterFunc`
 
-We want to be able to schedule our program to print the blind bet values at certain durations dependant on the number of players.
+우리는 프로그램이 플레이어 수에 연관된 특정 시간마다 블라인드 베팅 값를 프린트 하도록 스케줄링하기를 원한다. 
 
-To limit the scope of what we need to do, we'll forget about the number of players part for now and just assume there are 5 players so we'll test that _every 10 minutes the new value of the blind bet is printed_.
+우리가 하려는 것의 범위를 제한하기 위해, 일단 플레이어 수 부분을 생각하지 않고 5명의 플레이어가 있다고 가정하고 우리는 _매 10분마다 새로운 블라인드 베팅 값이 출력하도록_ 테스트 할 것이다.
+평소와 같이 표준 라이브러리에는 [`func AfterFunc(d Duration, f func()) *Timer`](https://golang.org/pkg/time/#AfterFunc)가 포함되어 있다.
 
-As usual the standard library has us covered with [`func AfterFunc(d Duration, f func()) *Timer`](https://golang.org/pkg/time/#AfterFunc)
-
-> `AfterFunc` waits for the duration to elapse and then calls f in its own goroutine. It returns a `Timer` that can be used to cancel the call using its Stop method.
+> `AfterFunc`는 특정 시간이 지날 때까지 기다리고 그 다음 f를 자신의 고루틴으로 호출 한다.`Timer`를 리턴하며, 그것의 Stop 메서드를 통해서 호출을 취소할 수 있습니다.
 
 ### [`time.Duration`](https://golang.org/pkg/time/#Duration)
 
-> A Duration represents the elapsed time between two instants as an int64 nanosecond count.
+> Duration은 int64의 nanosecond(나노초) 카운트로 두 순간 사이의 경과 시간을 나타냅니다
 
-The time library has a number of constants to let you multiply those nanoseconds so they're a bit more readable for the kind of scenarios we'll be doing
+time 라이브러리는 많은 상수(constant)를 가지고 있고 그 nanoseconds(나노초) 상수들을 곱해서 사용할 수 있도록 하여 우리가 하려는 시나리오의 종류에서 조금 더 가독성 있게 도와줍니다.
 
 ```go
 5 * time.Second
 ```
 
-When we call `PlayPoker` we'll schedule all of our blind alerts.
+우리가 `PlayPoker`라는 것을 호출할 때 우리의 모든 블라인드 알람이 스케줄된다.
 
-Testing this may be a little tricky though. We'll want to verify that each time period is scheduled with the correct blind amount but if you look at the signature of `time.AfterFunc` its second argument is the function it will run. You cannot compare functions in Go so we'd be unable to test what function has been sent in. So we'll need to write some kind of wrapper around `time.AfterFunc` which will take the time to run and the amount to print so we can spy on that.
+이것을 테스트하는 것은 조금 까다로울 수 있다. 우리는 각각의 시간 간격이 정확한 블라인드 값과 같이 스케줄되는지 검증하기를 원한다. 하지만 `time.AfterFunc` 시그니쳐를 확인 해보면 2번째 인자로 실행되는 함수를 가지고 있다. Go에서는 함수를 비교할 수 없어서 우리는 어떤 함수가 전달 되었는지 테스트 할 수 없다. 그래서 우리는 `time.AfterFunc` 주변을 감싸는 코드를 작성하여 작동하는 시간(시간 간격)과 출력해야 할 양(블라인드 값)을 받아서 감시 할 수 있도록 해야 한다.
 
 ## Write the test first
 
-Add a new test to our suite
+우리의 코드에 새로운 테스트를 추가하자.
 
 ```go
 t.Run("it schedules printing of blind values", func(t *testing.T) {
@@ -93,11 +91,10 @@ t.Run("it schedules printing of blind values", func(t *testing.T) {
 })
 ```
 
-You'll notice we've made a `SpyBlindAlerter` which we are trying to inject into our `CLI` and then checking that after we call `PlayPoker` that an alert is scheduled.
+위에서 보면, 우리는 `SpyBlindAlerter`라는 것을 만들어 `CLI`에 주입 하고 `PlayPoker`를 호출하여 알림이 스케줄되는 것을 확인하게 하였다.
+(우리는 단지 가장 간단한 시나리오를 먼저 작성하고 그 다음 반복해서 진행하는 것을 기억하자.)
 
-(Remember we are just going for the simplest scenario first and then we'll iterate.)
-
-Here's the definition of `SpyBlindAlerter`
+아래가  `SpyBlindAlerter`의 정의이다.
 
 ```go
 type SpyBlindAlerter struct {
@@ -127,7 +124,7 @@ func (s *SpyBlindAlerter) ScheduleAlertAt(duration time.Duration, amount int) {
 
 ## Write the minimal amount of code for the test to run and check the failing test output
 
-We have added a new argument and the compiler is complaining. _Strictly speaking_ the minimal amount of code is to make `NewCLI` accept a `*SpyBlindAlerter` but let's cheat a little and just define the dependency as an interface.
+우리는 새로운 인자를 추가했고 컴파일러는 그것에 대해 문제를 알려 주었다. _엄밀히 말하면_ 최소한의 코드는 `NewCLI`가 `*SpyBlindAlerter`를 받도록 하는 것이지만 약간의 속임수를 이용하여 그냥 종속성을 인터페이스를 통해 정의해주도록 하자.
 
 ```go
 type BlindAlerter interface {
@@ -135,25 +132,25 @@ type BlindAlerter interface {
 }
 ```
 
-And then add it to the constructor
+그리고 그 다음 생성자에 추가하자.
 
 ```go
 func NewCLI(store PlayerStore, in io.Reader, alerter BlindAlerter) *CLI
 ```
 
-Your other tests will now fail as they don't have a `BlindAlerter` passed in to `NewCLI`.
+당신의 다른 테스트는 `NewCLI`에 `BlindAlerter`를 전달하지 않기 때문에 실패 할 것이다.
 
-Spying on BlindAlerter is not relevant for the other tests so in the test file add
+다른 테스트에는 블라인드 알람을 감시하는 것과 관련이 없으니 테스트 파일에 다음과 같이 더하자
 
 ```go
 var dummySpyAlerter = &SpyBlindAlerter{}
 ```
 
-Then use that in the other tests to fix the compilation problems. By labelling it as a "dummy" it is clear to the reader of the test that it is not important.
+다른 테스트에서 위를 사용하면 컴파일 문제를 해결 할 수 있다. "dummy"라고 명명하게 되면 테스트를 읽는 사람에게 그것이 중요하지 않다라고 분명히 할 수 있다.
 
-[> Dummy objects are passed around but never actually used. Usually they are just used to fill parameter lists.](https://martinfowler.com/articles/mocksArentStubs.html)
+[> 더미 객체가 주변에 전달 되지만 실제로 절대 사용되지 않는다. 보통 더미는 단지 매개 변수 리스트를 채우는 데 사용 된다.](https://martinfowler.com/articles/mocksArentStubs.html)
 
-The tests should now compile and our new test fails.
+테스트는 이제 컴파일 되지만 우리의 새로운 테스트는 실패한다.
 
 ```
 === RUN   TestCLI
